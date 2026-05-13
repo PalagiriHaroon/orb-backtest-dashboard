@@ -155,8 +155,8 @@ def render_trades_table(trades, config):
             return "color: #ff6b6b"
         return ""
 
-    styled = df.style.applymap(color_result, subset=["Result"])
-    styled = styled.applymap(color_pnl, subset=["P&L"])
+    styled = df.style.map(color_result, subset=["Result"])
+    styled = styled.map(color_pnl, subset=["P&L"])
     styled = styled.format({
         "Entry": "{:.2f}",
         "SL": "{:.2f}",
