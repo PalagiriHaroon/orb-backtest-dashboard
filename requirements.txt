@@ -1,0 +1,8 @@
+yfinance>=1.2.0
+pandas>=2.0.0
+numpy>=2.0.0
+plotly>=5.0.0
+streamlit>=1.30.0
+peewee>=3.17.0
+rich>=13.0.0
+plotext>=5.0.0
