@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python --version)",
+      "PowerShell(pip list)",
+      "Bash(pip list *)",
+      "PowerShell(python -c \"import rich; help\\(rich.layout\\)\" 2>$null | Select-Object -First 60)",
+      "PowerShell(python -c \"from rich.layout import Layout; print\\(Layout.__doc__\\)\")",
+      "PowerShell(python -c \"from rich.table import Table; from rich.panel import Panel; from rich.live import Live; print\\('rich imports OK'\\)\")",
+      "PowerShell(python -c \"from rich.layout import Layout; l = Layout\\(\\); l.split_column\\(Layout\\(name='top'\\), Layout\\(name='bottom'\\)\\); l['top'].split_row\\(Layout\\(name='left'\\), Layout\\(name='right'\\)\\); print\\('Layout split works'\\); print\\(type\\(l\\)\\)\")",
+      "PowerShell(python -c \"import yfinance as yf; t = yf.Ticker\\('RELIANCE.NS'\\); h = t.history\\(period='5d'\\); print\\(h.columns.tolist\\(\\)\\); print\\(h.head\\(2\\)\\)\")",
+      "PowerShell(python -c \"import yfinance as yf; t = yf.Ticker\\('RELIANCE.NS'\\); h = t.history\\(period='5y'\\); print\\('Rows:', len\\(h\\)\\); print\\('Date range:', h.index.min\\(\\), 'to', h.index.max\\(\\)\\); print\\(h.head\\(2\\)\\)\")",
+      "PowerShell(python -c \"import yfinance as yf; data = yf.download\\(['AAPL','MSFT'], period='5d', group_by='ticker'\\); print\\(type\\(data\\)\\); print\\(data.columns.tolist\\(\\)[:10]\\); print\\(data['AAPL'].head\\(2\\)\\)\")",
+      "PowerShell(python -c \"from peewee import SqliteDatabase; print\\('peewee import OK'\\)\")",
+      "PowerShell(python -c \"import yfinance as yf; data = yf.download\\(['RELIANCE.NS','TCS.NS'], period='5d', group_by='ticker'\\); print\\('India batch OK, shape:', data.shape\\)\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
