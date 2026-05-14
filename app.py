@@ -6,7 +6,7 @@ import datetime
 import time
 import threading
 
-from config import INDIA_CONFIG, USA_CONFIG, BACKTEST_YEARS, DB_PATH
+from config import INDIA_CONFIG, USA_CONFIG, BACKTEST_YEARS, DB_PATH, MarketConfig
 from models import initialize_db, BacktestRun
 from data_loader import download_universe, get_trading_dates
 from orb_simulator import ORBDaySimulator
@@ -51,8 +51,15 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 def make_config(base_config, starting_capital, risk_pct):
-    from dataclasses import replace
-    return replace(base_config, starting_capital=starting_capital, risk_per_trade_pct=risk_pct)
+    return MarketConfig(
+        name=base_config.name,
+        currency_symbol=base_config.currency_symbol,
+        starting_capital=starting_capital,
+        risk_per_trade_pct=risk_pct,
+        max_trades_per_day=base_config.max_trades_per_day,
+        gap_threshold=base_config.gap_threshold,
+        universe=base_config.universe,
+    )
 
 
 def run_backtest_for_market(config, data, results_dict, key):
