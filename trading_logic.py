@@ -60,8 +60,8 @@ def compute_entry_sl_target(
     if risk <= 0:
         return None
 
-    direction = "LONG" if bias == "BULLISH" else "SHORT"
-    if direction == "LONG":
+    direction = "BUY CE" if bias == "BULLISH" else "BUY PE"
+    if direction == "BUY CE":
         target = entry + rr_ratio * risk
     else:
         target = entry - rr_ratio * risk
@@ -75,10 +75,14 @@ def compute_entry_sl_target(
     }
 
 
-def compute_position_size(max_risk: float, risk_per_share: float) -> int:
-    if risk_per_share <= 0:
+def estimate_option_premium(stock_price: float, atr: float, fraction: float = 0.4) -> float:
+    return atr * fraction
+
+
+def compute_position_size(max_risk: float, premium: float) -> int:
+    if premium <= 0:
         return 0
-    return max(1, math.floor(max_risk / risk_per_share))
+    return max(1, math.floor(max_risk / premium))
 
 
 def determine_exit(
@@ -86,7 +90,7 @@ def determine_exit(
     day_high: float, day_low: float, day_close: float,
     direction: str,
 ) -> tuple[str, float]:
-    if direction == "LONG":
+    if direction == "BUY CE":
         target_hit = day_high >= target
         sl_hit = day_low <= sl
         if target_hit and sl_hit:
@@ -113,8 +117,12 @@ def determine_exit(
 
 
 def compute_pnl(
-    entry: float, exit_price: float, shares: int, direction: str
+    entry: float, exit_price: float, lots: int, direction: str,
+    premium: float = 0.0,
 ) -> float:
-    if direction == "LONG":
-        return (exit_price - entry) * shares
-    return (entry - exit_price) * shares
+    if direction == "BUY CE":
+        raw_pnl = (exit_price - entry) * lots
+    else:
+        raw_pnl = (entry - exit_price) * lots
+    max_loss = -(premium * lots)
+    return max(raw_pnl, max_loss)

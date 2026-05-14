@@ -50,6 +50,11 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def make_config(base_config, starting_capital, risk_pct):
+    from dataclasses import replace
+    return replace(base_config, starting_capital=starting_capital, risk_per_trade_pct=risk_pct)
+
+
 def run_backtest_for_market(config, data, results_dict, key):
     sim = ORBDaySimulator(config)
     dates = get_trading_dates(data)
@@ -75,15 +80,17 @@ def run_backtest_for_market(config, data, results_dict, key):
             trades_list.append({
                 "Date": str(t.date),
                 "Symbol": t.symbol,
+                "Option": t.option_type,
                 "Direction": t.direction,
                 "Bias": t.bias,
                 "Entry": t.entry,
                 "SL": t.sl,
                 "Target": t.target,
                 "Exit": t.exit_price,
+                "Premium": t.premium,
+                "Lots": t.lots,
                 "P&L": t.pnl,
                 "Result": t.exit_reason,
-                "Shares": t.shares,
             })
 
         if capital > peak:
@@ -162,6 +169,7 @@ def render_trades_table(trades, config):
         "SL": "{:.2f}",
         "Target": "{:.2f}",
         "Exit": "{:.2f}",
+        "Premium": "{:.2f}",
         "P&L": "{:+,.2f}",
     })
 
@@ -280,7 +288,20 @@ def build_full_chart(india_state, usa_state):
 
 def main():
     st.title("📈 ORB Backtest Dashboard")
-    st.caption(f"Opening Range Breakout Strategy | {BACKTEST_YEARS}-Year Backtest | India NSE + USA NYSE/NASDAQ")
+    st.caption(f"Opening Range Breakout Strategy | {BACKTEST_YEARS}-Year Backtest | Options Only (Buy CE/PE)")
+
+    st.sidebar.header("Settings")
+    risk_pct = st.sidebar.slider("Risk per Trade (%)", min_value=1, max_value=10, value=4, step=1) / 100
+    st.sidebar.divider()
+    st.sidebar.subheader("India")
+    india_capital = st.sidebar.number_input("Starting Capital (₹)", min_value=10_000, max_value=10_000_000, value=100_000, step=10_000)
+    st.sidebar.subheader("USA")
+    usa_capital = st.sidebar.number_input("Starting Capital ($)", min_value=100, max_value=1_000_000, value=1_000, step=100)
+    st.sidebar.divider()
+    st.sidebar.caption("Options only — Buy CE (bullish) / Buy PE (bearish). No leverage. Max loss = premium paid.")
+
+    india_cfg = make_config(INDIA_CONFIG, float(india_capital), risk_pct)
+    usa_cfg = make_config(USA_CONFIG, float(usa_capital), risk_pct)
 
     if "results" not in st.session_state:
         st.session_state.results = {}
@@ -298,7 +319,7 @@ def main():
         with col_btn:
             run_btn = st.button("🚀 Run Backtest", type="primary", use_container_width=True)
         with col_info:
-            st.info(f"Downloads {len(INDIA_CONFIG.universe)} India + {len(USA_CONFIG.universe)} USA tickers, then backtests {BACKTEST_YEARS} years of daily data.")
+            st.info(f"Downloads {len(india_cfg.universe)} India + {len(usa_cfg.universe)} USA tickers, then backtests {BACKTEST_YEARS} years of daily data. Risk: {risk_pct*100:.0f}% per trade.")
 
         if run_btn and not st.session_state.running:
             st.session_state.running = True
@@ -311,7 +332,7 @@ def main():
                 st.write("Fetching India (NSE) tickers...")
                 prog_india = st.progress(0, text="India: starting...")
                 india_data = download_universe(
-                    INDIA_CONFIG.universe, BACKTEST_YEARS,
+                    india_cfg.universe, BACKTEST_YEARS,
                     lambda done, total: prog_india.progress(done / total, text=f"India: {done}/{total} chunks")
                 )
                 prog_india.progress(1.0, text=f"India: {len(india_data)} tickers loaded")
@@ -319,7 +340,7 @@ def main():
                 st.write("Fetching USA (NYSE/NASDAQ) tickers...")
                 prog_usa = st.progress(0, text="USA: starting...")
                 usa_data = download_universe(
-                    USA_CONFIG.universe, BACKTEST_YEARS,
+                    usa_cfg.universe, BACKTEST_YEARS,
                     lambda done, total: prog_usa.progress(done / total, text=f"USA: {done}/{total} chunks")
                 )
                 prog_usa.progress(1.0, text=f"USA: {len(usa_data)} tickers loaded")
@@ -328,11 +349,11 @@ def main():
 
                 st.write("Running India backtest...")
                 results = {}
-                run_backtest_for_market(INDIA_CONFIG, india_data, results, "india")
+                run_backtest_for_market(india_cfg, india_data, results, "india")
                 st.write(f"India complete: {results['india']['total']} trades")
 
                 st.write("Running USA backtest...")
-                run_backtest_for_market(USA_CONFIG, usa_data, results, "usa")
+                run_backtest_for_market(usa_cfg, usa_data, results, "usa")
                 st.write(f"USA complete: {results['usa']['total']} trades")
 
                 status.update(label="Backtest complete!", state="complete")
@@ -357,11 +378,11 @@ def main():
 
         with india_col:
             st.subheader("🇮🇳 India NSE")
-            render_market_metrics(india, INDIA_CONFIG)
+            render_market_metrics(india, india_cfg)
 
         with usa_col:
             st.subheader("🇺🇸 USA NYSE/NASDAQ")
-            render_market_metrics(usa, USA_CONFIG)
+            render_market_metrics(usa, usa_cfg)
 
         st.divider()
 
@@ -375,10 +396,10 @@ def main():
         tab_india, tab_usa, tab_all = st.tabs(["🇮🇳 India Trades", "🇺🇸 USA Trades", "📊 Combined"])
 
         with tab_india:
-            render_trades_table(india.get("trades", []), INDIA_CONFIG)
+            render_trades_table(india.get("trades", []), india_cfg)
 
         with tab_usa:
-            render_trades_table(usa.get("trades", []), USA_CONFIG)
+            render_trades_table(usa.get("trades", []), usa_cfg)
 
         with tab_all:
             all_trades = []
@@ -399,13 +420,14 @@ def main():
         with col1:
             st.subheader("India Summary")
             summary_india = {
-                "Starting Capital": f"₹{INDIA_CONFIG.starting_capital:,.0f}",
+                "Starting Capital": f"₹{india_cfg.starting_capital:,.0f}",
                 "Final Capital": f"₹{india.get('capital', 0):,.0f}",
                 "Net P&L": f"₹{india.get('pnl', 0):,.0f}",
-                "Return %": f"{india.get('pnl', 0) / INDIA_CONFIG.starting_capital * 100:.1f}%",
+                "Return %": f"{india.get('pnl', 0) / india_cfg.starting_capital * 100:.1f}%",
                 "Total Trades": str(india.get("total", 0)),
                 "Win Rate": f"{india.get('win_rate', 0)}%",
                 "Wins / Losses": f"{india.get('wins', 0)} / {india.get('losses', 0)}",
+                "Risk per Trade": f"{risk_pct*100:.0f}%",
             }
             for k, v in summary_india.items():
                 st.markdown(f"**{k}:** {v}")
@@ -413,13 +435,14 @@ def main():
         with col2:
             st.subheader("USA Summary")
             summary_usa = {
-                "Starting Capital": f"${USA_CONFIG.starting_capital:,.0f}",
+                "Starting Capital": f"${usa_cfg.starting_capital:,.0f}",
                 "Final Capital": f"${usa.get('capital', 0):,.0f}",
                 "Net P&L": f"${usa.get('pnl', 0):,.0f}",
-                "Return %": f"{usa.get('pnl', 0) / USA_CONFIG.starting_capital * 100:.1f}%",
+                "Return %": f"{usa.get('pnl', 0) / usa_cfg.starting_capital * 100:.1f}%",
                 "Total Trades": str(usa.get("total", 0)),
                 "Win Rate": f"{usa.get('win_rate', 0)}%",
                 "Wins / Losses": f"{usa.get('wins', 0)} / {usa.get('losses', 0)}",
+                "Risk per Trade": f"{risk_pct*100:.0f}%",
             }
             for k, v in summary_usa.items():
                 st.markdown(f"**{k}:** {v}")

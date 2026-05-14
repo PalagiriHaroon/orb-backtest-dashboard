@@ -2,12 +2,13 @@ from dataclasses import dataclass
 import datetime
 import pandas as pd
 
-from config import MarketConfig, OR_ATR_FRACTION, SL_BUFFER_PCT, RISK_REWARD_RATIO
+from config import MarketConfig, OR_ATR_FRACTION, SL_BUFFER_PCT, RISK_REWARD_RATIO, PREMIUM_ATR_FRACTION
 from trading_logic import (
     compute_opening_range,
     detect_breakout,
     simulate_retracement_candle,
     compute_entry_sl_target,
+    estimate_option_premium,
     compute_position_size,
     determine_exit,
     compute_pnl,
@@ -21,6 +22,7 @@ class TradeResult:
     symbol: str
     bias: str
     direction: str
+    option_type: str
     or_high: float
     or_low: float
     entry: float
@@ -28,7 +30,8 @@ class TradeResult:
     target: float
     exit_price: float
     exit_reason: str
-    shares: int
+    lots: int
+    premium: float
     risk_amount: float
     pnl: float
     pnl_pct: float
@@ -126,18 +129,26 @@ class ORBDaySimulator:
         entry = setup["entry"]
         sl = setup["sl"]
         target = setup["target"]
-        risk_per_share = setup["risk_per_share"]
         direction = setup["direction"]
 
-        shares = compute_position_size(self.config.max_risk_per_trade, risk_per_share)
-        if shares <= 0:
+        option_type = "CE" if bias == "BULLISH" else "PE"
+        direction = "BUY CE" if bias == "BULLISH" else "BUY PE"
+
+        premium = estimate_option_premium(open_p, atr, PREMIUM_ATR_FRACTION)
+        if premium <= 0:
+            return None
+
+        max_risk = capital * self.config.risk_per_trade_pct
+        lots = compute_position_size(max_risk, premium)
+        if lots <= 0:
             return None
 
         exit_reason, exit_price = determine_exit(
             entry, sl, target, high, low, close, direction
         )
-        pnl = compute_pnl(entry, exit_price, shares, direction)
-        pnl_pct = (pnl / (entry * shares) * 100) if entry * shares > 0 else 0.0
+        pnl = compute_pnl(entry, exit_price, lots, direction, premium)
+        risk_amount = premium * lots
+        pnl_pct = (pnl / risk_amount * 100) if risk_amount > 0 else 0.0
 
         clean_symbol = ticker.replace(".NS", "")
 
@@ -147,6 +158,7 @@ class ORBDaySimulator:
             symbol=clean_symbol,
             bias=bias,
             direction=direction,
+            option_type=option_type,
             or_high=round(or_high, 2),
             or_low=round(or_low, 2),
             entry=round(entry, 2),
@@ -154,8 +166,9 @@ class ORBDaySimulator:
             target=round(target, 2),
             exit_price=round(exit_price, 2),
             exit_reason=exit_reason,
-            shares=shares,
-            risk_amount=round(risk_per_share * shares, 2),
+            lots=lots,
+            premium=round(premium, 2),
+            risk_amount=round(risk_amount, 2),
             pnl=round(pnl, 2),
             pnl_pct=round(pnl_pct, 2),
         )

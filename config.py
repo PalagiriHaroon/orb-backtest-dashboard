@@ -7,6 +7,7 @@ SL_BUFFER_PCT = 0.15
 OR_ATR_FRACTION = 0.15
 RETRACEMENT_ATR_HIGH = 0.12
 RETRACEMENT_ATR_LOW = 0.02
+PREMIUM_ATR_FRACTION = 0.4
 DB_PATH = "backtest_results.db"
 
 
@@ -15,7 +16,7 @@ class MarketConfig:
     name: str
     currency_symbol: str
     starting_capital: float
-    max_risk_per_trade: float
+    risk_per_trade_pct: float
     max_trades_per_day: int
     gap_threshold: float
     universe: list[str] = field(default_factory=list)
@@ -55,7 +56,7 @@ INDIA_CONFIG = MarketConfig(
     name="India",
     currency_symbol="₹",
     starting_capital=100_000.0,
-    max_risk_per_trade=10_000.0,
+    risk_per_trade_pct=0.04,
     max_trades_per_day=3,
     gap_threshold=0.03,
     universe=INDIA_UNIVERSE,
@@ -65,7 +66,7 @@ USA_CONFIG = MarketConfig(
     name="USA",
     currency_symbol="$",
     starting_capital=1_000.0,
-    max_risk_per_trade=100.0,
+    risk_per_trade_pct=0.04,
     max_trades_per_day=3,
     gap_threshold=0.03,
     universe=USA_UNIVERSE,
